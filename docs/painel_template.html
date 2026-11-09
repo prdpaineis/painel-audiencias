@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audiências sem contestação</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Painel operacional: resumo por status no topo, fila acionável embaixo, ordenada pela hora da audiência */
+  --bg:#f4f5f7; --surface:#ffffff; --ink:#1b2430; --muted:#5d6876; --line:#dde1e6; --accent:#1f4e79;
+  --crit:#b42318; --crit-bg:#fdecea; --warn:#b54708; --warn-bg:#fef0e1; --caution:#8a6d00; --caution-bg:#fdf6d8;
+  --ok:#1e7a46; --ok-bg:#e5f4ec; --unk:#5b4fa8; --unk-bg:#eeecfa;
+  --display:"IBM Plex Sans Condensed","Arial Narrow",sans-serif; --body:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12161c; --surface:#1a2029; --ink:#e6e9ee; --muted:#9aa4b2; --line:#2c3440; --accent:#7fb0e0;
+  --crit:#ff8a80; --crit-bg:#3a1d1c; --warn:#ffb86b; --warn-bg:#3a2a17; --caution:#e8cf6a; --caution-bg:#33301a;
+  --ok:#6fd39c; --ok-bg:#16301f; --unk:#b6acf5; --unk-bg:#26233d; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#12161c; --surface:#1a2029; --ink:#e6e9ee; --muted:#9aa4b2; --line:#2c3440; --accent:#7fb0e0;
+  --crit:#ff8a80; --crit-bg:#3a1d1c; --warn:#ffb86b; --warn-bg:#3a2a17; --caution:#e8cf6a; --caution-bg:#33301a;
+  --ok:#6fd39c; --ok-bg:#16301f; --unk:#b6acf5; --unk-bg:#26233d; color-scheme:dark;}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.45 var(--body);padding:24px 16px 48px}
+.wrap{max-width:1240px;margin:0 auto;display:grid;gap:20px}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px}
+h1{font:600 26px/1.15 var(--display);margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:4px 0 0}
+.tag{font:500 12px var(--mono);color:var(--muted);border:1px solid var(--line);padding:3px 8px;border-radius:4px;background:var(--surface)}
+.tiles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+@media (max-width:900px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tile{all:unset;cursor:pointer;background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--c);border-radius:6px;padding:12px 14px;display:grid;gap:2px}
+.tile:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tile[aria-pressed="true"]{background:var(--cb);border-color:var(--c)}
+.tile .n{font:600 30px/1 var(--display);color:var(--c);font-variant-numeric:tabular-nums}
+.tile .l{font-weight:600}
+.tile .h{color:var(--muted);font-size:12.5px}
+.s1{--c:var(--crit);--cb:var(--crit-bg)} .s2{--c:var(--warn);--cb:var(--warn-bg)} .s3{--c:var(--caution);--cb:var(--caution-bg)} .s4{--c:var(--ok);--cb:var(--ok-bg)} .s5{--c:var(--unk);--cb:var(--unk-bg)}
+.days{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px 16px;display:grid;gap:8px}
+.days h2,.rule h2{font:600 15px var(--display);margin:0;letter-spacing:.02em}
+.dayrow{display:grid;grid-template-columns:90px 1fr 60px;gap:10px;align-items:center;font-size:13px}
+.bar{display:flex;height:14px;border-radius:3px;overflow:hidden;background:var(--line)}
+.bar span{background:var(--c);display:block}
+.dayrow .t{font-family:var(--mono);color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.tools label{font-size:12.5px;color:var(--muted);display:flex;gap:6px;align-items:center}
+select,button.btn,input{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:6px 10px}
+button.btn{cursor:pointer;font-weight:600}
+button.btn.primary{background:var(--accent);color:var(--surface);border-color:var(--accent)}
+button.btn:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.msg{font-size:12.5px;color:var(--ok)}
+.tablebox{background:var(--surface);border:1px solid var(--line);border-radius:6px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:920px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font:600 12px var(--display);text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:var(--surface)}
+td.mono{font-family:var(--mono);font-size:12.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.s1 td:first-child{box-shadow:inset 4px 0 var(--crit)} tr.s2 td:first-child{box-shadow:inset 4px 0 var(--warn)} tr.s3 td:first-child{box-shadow:inset 4px 0 var(--caution)} tr.s5 td:first-child{box-shadow:inset 4px 0 var(--unk)}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--cb);color:var(--c);white-space:nowrap}
+.late{color:var(--crit);font-weight:600}
+.dim{color:var(--muted)}
+.rule{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px 16px;display:grid;gap:10px}
+.rule ol{margin:0;padding-left:20px;display:grid;gap:6px;max-width:80ch}
+.cmp{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (max-width:700px){.cmp{grid-template-columns:1fr}}
+.cmp div{border:1px solid var(--line);border-radius:5px;padding:10px 12px}
+.cmp b{font:600 22px var(--display);display:block;font-variant-numeric:tabular-nums}
+.empty{padding:24px;text-align:center;color:var(--muted)}
+.intro{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (max-width:800px){.intro{grid-template-columns:1fr}}
+.card,.steps{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px 16px}
+.card h2,.steps h2{font:600 15px var(--display);margin:0 0 6px;letter-spacing:.02em}
+.card p{margin:0;max-width:65ch}
+.card .big b{font:600 20px var(--display);color:var(--crit);font-variant-numeric:tabular-nums}
+.steps ol{margin:0;padding-left:20px;display:grid;gap:6px;max-width:80ch}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <h1>Audiências da semana sem contestação</h1>
+    <p class="sub">Evitar audiência sem defesa · audiências de __PERIODO__</p>
+  </div>
+  <span class="tag">Dados do Odoo de __GERADO__</span>
+</header>
+
+<section class="intro">
+  <div class="card">
+    <h2>Por que</h2>
+    <p>Toda semana conferimos umas 200 audiências, uma por uma, para saber se a defesa foi apresentada. Audiência sem contestação pode virar revelia. A conferência manual não dá conta do volume.</p>
+  </div>
+  <div class="card">
+    <h2>O que muda</h2>
+    <p>O painel lê o Odoo todos os dias às 07:00 e classifica cada audiência dos próximos dias pela situação da defesa. Os casos em risco saem em ordem de dia e hora, com a ação em aberto e quem está com ela. O botão de copiar monta a lista para cada líder.</p>
+  </div>
+  <div class="card">
+    <h2>Neste período, de __TOTAL__</h2>
+    <p class="big"><b>__RISCO__</b> precisam de atenção. Destes, <b>__SEMPECA__</b> ainda não têm peça nenhuma, e <b>__SEMRESP__</b> desses estão sem responsável no Odoo.</p>
+  </div>
+</section>
+
+<section class="steps" aria-label="Próximos passos">
+  <h2>Como vamos usar</h2>
+  <ol>
+    <li><b>Segunda de manhã:</b> o painel é gerado com as audiências da semana seguinte.</li>
+    <li><b>Líderes</b> recebem a lista dos seus casos, com data e hora, e priorizam primeiro "Sem peça" e "Conferir".</li>
+    <li><b>Ao longo da semana</b> o painel é atualizado todo dia: o caso sai da lista quando a contestação é validada e protocolada.</li>
+  </ol>
+</section>
+
+<div class="tiles" id="tiles"></div>
+
+<section class="days" aria-label="Audiências por dia">
+  <h2>Por dia da audiência</h2>
+  <div id="days"></div>
+</section>
+
+<div class="tools">
+  <label for="fg">Grupo <select id="fg"><option value="">Todos</option></select></label>
+  <label for="fd">Dia <select id="fd"><option value="">Todos</option></select></label>
+  <label for="fq">Dossiê <input id="fq" type="search" placeholder="número"></label>
+  <button class="btn" id="clr" type="button">Limpar filtros</button>
+  <button class="btn primary" id="cp" type="button">Copiar lista para os líderes</button>
+  <span class="msg" id="msg" role="status"></span>
+</div>
+
+<div class="tablebox">
+<table>
+<thead><tr><th>Audiência</th><th>Dossiê</th><th>Grupo</th><th>Status da defesa</th><th>Ação em aberto</th><th>Responsável / fila</th><th>Prazo da ação</th><th>Vara</th></tr></thead>
+<tbody id="tb"></tbody>
+</table>
+</div>
+
+<section class="rule">
+  <h2>Como cada dossiê é classificado</h2>
+  <ol>
+    <li><b>Sem peça:</b> não existe Validar contestação, nem aberta nem concluída, e há Verificar parecer, Solicitar parecer, Validar parecer, Elaborar ou Refazer contestação em aberto.</li>
+    <li><b>Peça aguardando validação:</b> Validar contestação em aberto. A peça existe, mas não foi validada nem protocolada.</li>
+    <li><b>Validada, falta protocolar:</b> Validar contestação concluída e Protocolar ou Verificar protocolar para audiência ainda em aberto.</li>
+    <li><b>Com defesa:</b> Validar contestação concluída e Protocolar concluído.</li>
+    <li><b>Conferir:</b> nenhuma ação de contestação no Odoo, ou a Validar contestação foi cancelada. O painel não tem como afirmar se houve defesa.</li>
+  </ol>
+  </div>
+  <p class="dim" style="margin:0">"Verificar complementação do parecer" não entra: ela não indica falta de defesa (quase sempre com a contestação já validada).</p>
+</section>
+</div>
+
+<script>
+const DATA = __DATA__;
+const ST = {1:["Sem peça","nem contestação elaborada"],2:["Peça aguardando validação","Validar contestação aberta"],3:["Validada, falta protocolar","protocolo em aberto"],4:["Com defesa","validada e protocolada"],5:["Conferir","sem ação de contestação no Odoo"]};
+const ORDER=[1,2,3,5,4];
+let fs=new Set([1,2,3,5]);
+const $=id=>document.getElementById(id);
+const DOW=["dom","seg","ter","qua","qui","sex","sáb"];
+const fmtDay=d=>{const x=new Date(d+"T12:00:00");return DOW[x.getDay()]+" "+d.slice(8,10)+"/"+d.slice(5,7)};
+const fmtDate=d=>d?d.slice(8,10)+"/"+d.slice(5,7):"";
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+const grupos=[...new Set(DATA.map(r=>r.g))].sort();
+grupos.forEach(g=>$("fg").insertAdjacentHTML("beforeend","<option>"+esc(g)+"</option>"));
+const dias=[...new Set(DATA.map(r=>r.dt.slice(0,10)))].sort();
+dias.forEach(d=>$("fd").insertAdjacentHTML("beforeend","<option value=\""+d+"\">"+fmtDay(d)+"</option>"));
+
+function base(){const g=$("fg").value,d=$("fd").value,q=$("fq").value.trim().toLowerCase();
+  return DATA.filter(r=>(!g||r.g===g)&&(!d||r.dt.startsWith(d))&&(!q||r.d.toLowerCase().includes(q)));}
+function rows(){return base().filter(r=>fs.has(r.s)).sort((a,b)=>a.dt.localeCompare(b.dt)||a.s-b.s);}
+
+function render(){
+  const b=base();
+  $("tiles").innerHTML=ORDER.map(s=>`<button type="button" class="tile s${s}" data-s="${s}" aria-pressed="${fs.has(s)}"><span class="n">${b.filter(r=>r.s===s).length}</span><span class="l">${ST[s][0]}</span><span class="h">${ST[s][1]}</span></button>`).join("");
+  document.querySelectorAll(".tile").forEach(t=>t.onclick=()=>{const s=+t.dataset.s;fs.has(s)?fs.delete(s):fs.add(s);render();});
+  const max=Math.max(...dias.map(d=>DATA.filter(r=>r.dt.startsWith(d)).length));
+  $("days").innerHTML=dias.map(d=>{const dd=b.filter(r=>r.dt.startsWith(d));const risk=dd.filter(r=>r.s!==4).length;
+    const segs=ORDER.map(s=>{const n=dd.filter(r=>r.s===s).length;return n?`<span class="s${s}" style="flex:${n}" title="${ST[s][0]}: ${n}"></span>`:""}).join("");
+    return `<div class="dayrow"><span>${fmtDay(d)}</span><div><div class="bar" style="width:${Math.max(4,dd.length/max*100)}%">${segs}</div></div><span class="t">${risk}/${dd.length}</span></div>`}).join("")+`<div class="dim" style="font-size:12px">À direita: em risco / total de audiências do dia.</div>`;
+  const rs=rows();
+  $("tb").innerHTML=rs.length?rs.map(r=>{const late=r.p&&r.p>r.dt.slice(0,10);
+    const resp=r.u==="sem responsável"?'<span class="late">sem responsável</span>':(esc(r.u)||'<span class="dim">—</span>');
+    return `<tr class="s${r.s}"><td class="mono">${fmtDay(r.dt.slice(0,10))} ${r.dt.slice(11)}</td><td class="mono">${esc(r.d)}</td><td>${esc(r.g)}</td><td><span class="pill s${r.s}">${ST[r.s][0]}</span></td><td>${esc(r.a)||'<span class="dim">—</span>'}</td><td>${resp}</td><td class="mono ${late?'late':''}">${fmtDate(r.p)}${late?' · depois da audiência':''}</td><td class="dim">${esc(r.v)}</td></tr>`}).join("")
+    :`<tr><td colspan="8" class="empty">Nenhum dossiê com esses filtros.</td></tr>`;
+}
+["fg","fd"].forEach(id=>$(id).onchange=render);$("fq").oninput=render;
+$("clr").onclick=()=>{$("fg").value="";$("fd").value="";$("fq").value="";fs=new Set([1,2,3,5]);render();};
+$("cp").onclick=async()=>{const rs=rows().filter(r=>r.s!==4);const by={};rs.forEach(r=>{const k=r.u||"sem responsável";(by[k]=by[k]||[]).push(r)});
+  const txt="Audiências da semana sem contestação\n\n"+Object.keys(by).sort().map(u=>u+"\n"+by[u].map(r=>"- "+fmtDay(r.dt.slice(0,10))+" "+r.dt.slice(11)+" · "+r.d+" · "+r.g+" · "+ST[r.s][0]).join("\n")).join("\n\n");
+  try{await navigator.clipboard.writeText(txt);$("msg").textContent=rs.length+" dossiês copiados, agrupados por responsável.";}catch(e){$("msg").textContent="O navegador bloqueou a cópia. Selecione a tabela e copie manualmente.";}};
+render();
+</script>
+</body>
+</html>

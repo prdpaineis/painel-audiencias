@@ -1,0 +1,36 @@
+name: Atualizar painel de audiências diariamente
+
+on:
+  schedule:
+    - cron: "0 10 * * *"   # 07:00 BRT (UTC-3), todos os dias
+  workflow_dispatch:          # permite rodar manualmente no GitHub
+
+jobs:
+  gerar:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # precisa para commitar index.html atualizado
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Extrair dados do Odoo e gerar painel
+        working-directory: docs
+        env:
+          ODOO_URL: ${{ secrets.ODOO_URL }}
+          ODOO_DB: ${{ secrets.ODOO_DB }}
+          ODOO_LOGIN: ${{ secrets.ODOO_LOGIN }}
+          ODOO_PASSWORD: ${{ secrets.ODOO_PASSWORD }}
+        run: python extrair.py
+
+      - name: Commitar painel atualizado
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/index.html
+          git diff --cached --quiet || git commit -m "painel: atualização automática $(date +'%d/%m/%Y')"
+          git push
